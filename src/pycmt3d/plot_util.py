@@ -16,7 +16,14 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from mpl_toolkits.basemap import Basemap
+##fm 1/4/2020
+# from mpl_toolkits.basemap import Basemap
+try:
+    from mpl_toolkits.basemap import Basemap
+except:
+    os.environ['PROJ_LIB']="/Users/fmagnoni/anaconda3/share/proj"
+    from mpl_toolkits.basemap import Basemap
+##
 from matplotlib.patches import Rectangle
 from obspy.geodetics import gps2dist_azimuth
 from obspy.imaging.beachball import beach
@@ -162,6 +169,8 @@ class PlotStats(object):
             ax_min = -abs_max
             ax_max = abs_max
         binwidth = (ax_max - ax_min) / num_bin
+        print('data_b for histogram',data_b) #fm
+        print('data_a for histogram',data_a) #fm
         plt.hist(
             data_b, bins=np.arange(ax_min, ax_max+binwidth/2., binwidth),
             facecolor='blue', alpha=0.3)
@@ -182,9 +191,13 @@ class PlotStats(object):
     def plot_stats_histogram_one_category(
             self, G, irow, cat_name, vtype_list, num_bins, vtype_dict):
         for var_idx, varname in enumerate(vtype_list):
+            print('var_idx, varname',var_idx, varname) #fm
             meta_varname = vtype_dict[varname]
+            print('meta_varname',meta_varname) #fm
             data_before, data_after = \
                 self.extract_metadata(cat_name, meta_varname)
+            print('data_before',data_before) #fm
+            print('data_after', data_after) #fm
             self.plot_stats_histogram_one_entry(
                 G[irow, var_idx], cat_name, varname, data_before, data_after,
                 num_bins[var_idx])
@@ -215,7 +228,9 @@ class PlotStats(object):
         G = gridspec.GridSpec(nrows, ncols)
 
         cat_names = sorted(self.metas_sort.keys())
+        print('cat_names',cat_names) #fm
         for irow, cat in enumerate(cat_names):
+            print('irow, cat', irow, cat)
             self.plot_stats_histogram_one_category(
                 G, irow, cat, vtype_list, num_bins, vtype_dict)
         plt.tight_layout()
@@ -377,8 +392,8 @@ class PlotInvSummary(object):
         format3 = "%15.3f  %15.3f  %18.3f  %18.3f   %18.2f%%"
 
         text = "Number of stations: %d          Number of widnows: %d" \
-               % (len(self.sta_lat), self.data_container.nwindows) + \
-               "Envelope coef: %5.2f"
+               % (len(self.sta_lat), self.data_container.nwindows) #+ \
+               #"Envelope coef: %5.2f".   #fm 
         plt.text(0, pos, text, fontsize=fontsize)
 
         pos -= incre
@@ -494,10 +509,24 @@ class PlotInvSummary(object):
         cmt_lon = self.cmtsource.longitude
         focmecs = get_cmt_par(self.cmtsource)[:6]
         ax = plt.gca()
-        bb = beach(focmecs, xy=(cmt_lon, cmt_lat), width=20, linewidth=1,
+        if self.mode=='regional':
+            minlon=min(self.sta_lon)
+            maxlon=max(self.sta_lon)
+            minlat=min(self.sta_lat)
+            maxlat=max(self.sta_lat)
+            padding=5.
+            m.drawparallels(np.arange(-90., 120., padding))
+            m.drawmeridians(np.arange(0., 420., padding))
+            ax.set_xlim(minlon-padding,maxlon+padding)
+            ax.set_ylim(minlat-padding,maxlat+padding)
+            width_beach=min((maxlon+2*padding-minlon)/(4*padding),(maxlat+2*padding-minlat)/(4*padding))
+        else:
+            width_beach=20
+        bb = beach(focmecs, xy=(cmt_lon, cmt_lat), width=width_beach, linewidth=1,
                    alpha=1.0)
         bb.set_zorder(10)
         ax.add_collection(bb)
+        
 
     def plot_sta_dist_azi(self):
         plt.title("Station Dist and Azi", fontsize=10)

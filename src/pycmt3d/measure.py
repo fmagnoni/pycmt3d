@@ -21,7 +21,7 @@ def _envelope(array):
     return np.abs(hilbert(array))
 
 
-def _xcorr_win_(arr1, arr2):
+def _xcorr_win_(arr1, arr2, ishift_max=None):
     """
     cross-correlation between arr1 and arr2 to get the max_cc_value
     and nshift
@@ -30,7 +30,11 @@ def _xcorr_win_(arr1, arr2):
         raise ValueError("Length of arr1(%d) and arr2(%d) must be the same"
                          % (len(arr1), len(arr2)))
     cc = np.correlate(arr1, arr2, mode="full")
-    nshift = cc.argmax() - len(arr1) + 1
+    if ishift_max:
+        cc=cc[len(arr1)-1-ishift_max:len(arr1)+ishift_max]
+        nshift = cc.argmax() - len(arr1) + 1 - ishift_max
+    else:
+        nshift = cc.argmax() - len(arr1) + 1
     # Normalized cross correlation.
     max_cc_value = \
         cc.max() / np.sqrt((arr1 ** 2).sum() * (arr2 ** 2).sum())
@@ -84,16 +88,21 @@ def _diff_energy_(arr1, arr2, taper=None):
         return np.sum((taper * (arr1 - arr2)) ** 2)
 
 
-def correct_window_index(arr1, arr2, istart, iend):
+def correct_window_index(arr1, arr2, istart, iend, ishift_max = None):
     """
     Correct the window index based on cross-correlation shift
     """
     npts = min(len(arr1), len(arr2))
-    max_cc, nshift = _xcorr_win_(arr1[istart:iend], arr2[istart:iend])
+    print(len(arr1), len(arr2))  #magnoni
+    max_cc, nshift = _xcorr_win_(arr1[istart:iend], arr2[istart:iend], 
+                                 ishift_max=ishift_max)
+    # print("max_cc", max_cc)  #magnoni
+    print("nshift", nshift)  #magnoni
     istart_d = max(1, istart + nshift)
     iend_d = min(npts, iend + nshift)
     istart_s = max(1, istart_d - nshift)
     iend_s = min(npts, iend_d - nshift)
+    print("istart_d, iend_d, istart_s, iend_s", istart_d, iend_d, istart_s, iend_s)  #magnoni
     if (iend_d - istart_d) != (iend_s - istart_s):
         raise ValueError("After correction, window length not the same: "
                          "[%d, %d] and [%d, %d]" % (istart_d, iend_d,
@@ -102,7 +111,7 @@ def correct_window_index(arr1, arr2, istart, iend):
 
 
 def measure_window(obsd_array, synt_array, istart, iend,
-                   station_correction=True):
+                   station_correction=True, ishift_max = None):
     """
     Make measurements on windows. If station_correction, correct window
     idx first based on cross-correlation time shift measurement.
@@ -116,8 +125,17 @@ def measure_window(obsd_array, synt_array, istart, iend,
     """
     # correct window index if required
     if station_correction:
-        istart_d, iend_d, istart_s, iend_s, max_cc, nshift = \
-            correct_window_index(obsd_array, synt_array, istart, iend)
+        if not ishift_max:
+            istart_d, iend_d, istart_s, iend_s, max_cc, nshift = \
+                correct_window_index(obsd_array, synt_array, istart, iend)
+            print('station corr, no ishiftmax:  istart, iend, istart_d, iend_d, istart_s, iend_s, nshift',istart, iend, istart_d, iend_d, istart_s, iend_s, nshift)
+        else:
+            istart_d, iend_d, istart_s, iend_s, max_cc, nshift = \
+                correct_window_index(obsd_array, synt_array, istart, iend, 
+                                     ishift_max=ishift_max)
+            print('station corr, ishiftmax: istart, iend, istart_d, iend_d, istart_s, iend_s, nshift ',istart, iend, istart_d, iend_d, istart_s, iend_s, nshift)
+            
+            
     else:
         max_cc, nshift = _xcorr_win_(obsd_array[istart:iend],
                                      synt_array[istart:iend])
@@ -125,6 +143,7 @@ def measure_window(obsd_array, synt_array, istart, iend,
         iend_d = iend
         istart_s = istart
         iend_s = iend
+        print('no station corr: istart, iend, istart_d, iend_d, istart_s, iend_s, nshift ',istart, iend, istart_d, iend_d, istart_s, iend_s, nshift)
 
     # make measurements
     _obs = obsd_array[istart_d: iend_d]
@@ -211,22 +230,47 @@ def calculate_dsyn(datalist, win_idx, parlist, dcmt_par, taper_type="tukey"):
     :param datalist:
     :return:
     """
-    istart = win_idx[0]
-    iend = win_idx[1]
-    win_len = iend - istart
+
+    #magnoni
+    # istart = win_idx[0]
+    # iend = win_idx[1]
+        
+    obsd = datalist['obsd']
+    synt = datalist['synt']
+    
+    obs_array = obsd.data
+    syn_array = synt.data
+    
+    # print('win_idx dsyn', win_idx[0], win_idx[1])
+    istart_d, iend_d, istart_s, iend_s, _, _ = \
+        correct_window_index(obs_array, syn_array, win_idx[0], win_idx[1])    
+    
+    # win_len = iend - istart
+    win_len = iend_s - istart_s
+    #########
+    
     taper = construct_taper(win_len, taper_type=taper_type)
 
     dsyn = np.zeros((len(parlist), win_len))
     for itype, type_name in enumerate(parlist):
         if itype < constant.NM:
             # moment tensor, linear term
+            #magnoni
+            # dsyn[itype, :] = \
+            #     datalist[type_name].data[istart:iend] / dcmt_par[itype]
             dsyn[itype, :] = \
-                datalist[type_name].data[istart:iend] / dcmt_par[itype]
+                datalist[type_name].data[istart_s:iend_s] / dcmt_par[itype]
+            ######
         elif itype < constant.NML:
             # location, finite difference to get dsyn
+            #magnoni
+            # dsyn[itype, :] = \
+            #     (datalist[type_name].data[istart:iend] -
+            #      datalist['synt'].data[istart:iend]) / dcmt_par[itype]
             dsyn[itype, :] = \
-                (datalist[type_name].data[istart:iend] -
-                 datalist['synt'].data[istart:iend]) / dcmt_par[itype]
+                (datalist[type_name].data[istart_s:iend_s] -
+                 datalist['synt'].data[istart_s:iend_s]) / dcmt_par[itype]                 
+            #####
         elif itype == constant.NML:
             # time shift
             dt = datalist['synt'].stats.delta
@@ -258,26 +302,53 @@ def calculate_denv(datalist, win_idx, parlist, dcmt_par, taper_type):
     :return:
     """
 
-    istart = win_idx[0]
-    iend = win_idx[1]
-    win_len = iend - istart
+    #magnoni
+    # istart = win_idx[0]
+    # iend = win_idx[1]
+    
+    obsd = datalist['obsd']
+    synt = datalist['synt']
+    
+    obs_array = obsd.data
+    syn_array = synt.data
+    
+    # print('win_idx denv', win_idx[0], win_idx[1])
+    istart_d, iend_d, istart_s, iend_s, _, _ = \
+        correct_window_index(obs_array, syn_array, win_idx[0], win_idx[1])    
+    
+    # win_len = iend - istart
+    win_len = iend_s - istart_s
+    #########
     taper = construct_taper(win_len, taper_type=taper_type)
 
     denv = np.zeros((len(parlist), win_len))
     for itype, type_name in enumerate(parlist):
         if itype < constant.NM:
+            #magnoni
             # moment tensor, linear term
+            # denv[itype, :] = \
+            #     (_envelope(taper * (datalist['synt'].data[istart:iend] +
+            #                         datalist[type_name].data[istart:iend])) -
+            #      _envelope(taper * (datalist['synt'].data[istart:iend]))) / \
+            #     dcmt_par[itype]
             denv[itype, :] = \
-                (_envelope(taper * (datalist['synt'].data[istart:iend] +
-                                    datalist[type_name].data[istart:iend])) -
-                 _envelope(taper * (datalist['synt'].data[istart:iend]))) / \
-                dcmt_par[itype]
+                (_envelope(taper * (datalist['synt'].data[istart_s:iend_s] +
+                                    datalist[type_name].data[istart_s:iend_s])) -
+                 _envelope(taper * (datalist['synt'].data[istart_s:iend_s]))) / \
+                dcmt_par[itype] 
+            ###########
         elif itype < constant.NML:
             # location, finite difference to get denv
+            #magnoni
+            # denv[itype, :] = \
+            #     (_envelope(taper * datalist[type_name].data[istart:iend]) -
+            #      _envelope(taper * datalist['synt'].data[istart:iend])) / \
+            #     dcmt_par[itype]
             denv[itype, :] = \
-                (_envelope(taper * datalist[type_name].data[istart:iend]) -
-                 _envelope(taper * datalist['synt'].data[istart:iend])) / \
+                (_envelope(taper * datalist[type_name].data[istart_s:iend_s]) -
+                 _envelope(taper * datalist['synt'].data[istart_s:iend_s])) / \
                 dcmt_par[itype]
+            #####
         elif itype == constant.NML:
             # time shift
             dt = datalist['synt'].stats.delta
@@ -312,6 +383,11 @@ def compute_derivatives(datalist, win_time, parlist, dcmt_par,
     dt = obsd.stats.delta
     check_trace_consistent(obsd, synt)
     win_idx = get_window_idx(win_time, obsd.stats.delta)
+    print(obsd)  #magnoni
+    print(synt)  #magnoni
+    # print(dt)  #magnoni
+    # print(win_time)  #magnoni
+    # print(win_idx)  #magnoni
 
     denv = calculate_denv(datalist, win_idx, parlist, dcmt_par,
                           taper_type)
@@ -332,12 +408,20 @@ def compute_envelope_matrix(denv, obsd, synt, dt, win_idx, taper_type):
     obs_array = obsd.copy()
     syn_array = synt.copy()
 
+    print(win_idx[0], win_idx[1])  #magnoni
     istart_d, iend_d, istart_s, iend_s, _, _ = \
         correct_window_index(obs_array, syn_array, win_idx[0], win_idx[1])
-
+    #print(istart_d, iend_d, istart_s, iend_s)  #magnoni
     taper = construct_taper(iend_s - istart_s, taper_type=taper_type)
 
     A1 = np.dot(denv, denv.transpose()) * dt
+    # print("len obs", len(obs_array[istart_d:iend_d]))  #magnoni
+    # print("len synt", len(syn_array[istart_s:iend_s]))  #magnoni
+    print("len hilb obs", len(np.abs(hilbert(taper * obs_array[istart_d:iend_d]))))  #magnoni
+    print("len hilb synt", len(np.abs(hilbert(taper * syn_array[istart_s:iend_s]))))  #magnoni
+    # print("denv row", len(denv))  #magnoni
+    # print("denv col", len(denv[0]))  #magnoni
+    print("denv len", denv.shape)  #magnoni
     b1 = np.sum(
         (np.abs(hilbert(taper * obs_array[istart_d:iend_d])) -
          np.abs(hilbert(taper * syn_array[istart_s:iend_s]))) *
@@ -396,7 +480,7 @@ def compute_envelope_matrix_theo(dsyn, obsd, synt, dt, win_idx, taper):
     return A1, b1
 
 
-def calculate_variance_on_trace(obsd, synt, win_time, taper_type="tukey"):
+def calculate_variance_on_trace(obsd, synt, win_time, taper_type="tukey", ishift_max=None):
     """
     Calculate the variance reduction on a pair of obsd and
     synt and windows
@@ -427,10 +511,10 @@ def calculate_variance_on_trace(obsd, synt, win_time, taper_type="tukey"):
         istart, iend = get_window_idx(win_time[_win_idx], obsd.stats.delta)
 
         istart_d, iend_d, istart_s, iend_s, _, _ = \
-            correct_window_index(obsd.data, synt.data, istart, iend)
+            correct_window_index(obsd.data, synt.data, istart, iend, ishift_max=ishift_max)
 
         nshift, cc, power_l1, power_l2, cc_amp_value = \
-            measure_window(obsd, synt, istart, iend)
+            measure_window(obsd, synt, istart, iend, ishift_max=ishift_max)
 
         taper = construct_taper(iend_d - istart_d, taper_type=taper_type)
 

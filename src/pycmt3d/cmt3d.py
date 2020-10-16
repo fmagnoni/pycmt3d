@@ -162,6 +162,7 @@ class Cmt3D(object):
                 # and no weightings has been applied yet
                 # Attention here, we use dcmt_par_scaled here; otherwise
                 # A1 and b1 would be too small.
+                print("trwin.windows", trwin.windows[win_idx])  #magnoni
                 Aw, bw, Ae, be = compute_derivatives(
                     trwin.datalist, trwin.windows[win_idx],
                     self.config.parlist, self.config.dcmt_par_scaled,
@@ -383,17 +384,19 @@ class Cmt3D(object):
         for meta, trwin in zip(self.metas, self.data_container.trwins):
             obsd = trwin.datalist['obsd']
             synt = trwin.datalist['synt']
+            print('trwin: ',trwin)
 
             # calculate old variance metrics
             meta.prov["synt"] = \
                 calculate_variance_on_trace(obsd, synt, trwin.windows,
-                                            self.config.taper_type)
+                                            self.config.taper_type, ishift_max=self.config.ishift_max)
+            #print('trwin.windows ',trwin.windows)
 
             new_synt = trwin.datalist['new_synt']
             # calculate new variance metrics
             meta.prov["new_synt"] = \
                 calculate_variance_on_trace(obsd, new_synt, trwin.windows,
-                                            self.config.taper_type)
+                                            self.config.taper_type, ishift_max=self.config.ishift_max)
 
             var_all += np.sum(0.5 * meta.prov["synt"]["chi"] * meta.weights)
             var_all_new += np.sum(0.5 * meta.prov["new_synt"]["chi"] *

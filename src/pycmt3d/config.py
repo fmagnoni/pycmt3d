@@ -107,7 +107,7 @@ class Config(object):
     def __init__(self, npar, dlocation=0.0, ddepth=0.0, dmoment=0.0,
                  scale_vector=None, zero_trace=True, double_couple=False,
                  envelope_coef=0.5,  max_nl_iter=60,
-                 damping=0.0, station_correction=True,
+                 damping=0.0, station_correction=True, ishift_max=None,
                  weight_data=True, weight_config=None,
                  bootstrap=True, bootstrap_repeat=300,
                  bootstrap_subset_ratio=0.4,
@@ -129,6 +129,7 @@ class Config(object):
         :param damping: damping coefficient
         :param station_correction: bool value of whether applies station
             correction
+        :param ishift_max: value of max station correction (number of points)
         :param weight_data: bool value of weighting data
         :param weight_config: the weighting configuration
         :param bootstrap: bool value of whether applied bootstrap method
@@ -168,6 +169,7 @@ class Config(object):
         self.weight_config = weight_config
 
         self.station_correction = station_correction
+        self.ishift_max=ishift_max
         self.zero_trace = zero_trace
         self.double_couple = double_couple
 

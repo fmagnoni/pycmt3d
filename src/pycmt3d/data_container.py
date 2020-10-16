@@ -161,42 +161,42 @@ class TraceWindow(object):
     def obsd_id(self):
         try:
             return self.datalist["obsd"].id
-        except:
+        except KeyError:
             return None
 
     @property
     def synt_id(self):
         try:
             return self.datalist["synt"].id
-        except:
+        except KeyError:
             return None
 
     @property
     def station(self):
         try:
             return self.datalist["obsd"].stats.station
-        except:
+        except KeyError:
             return None
 
     @property
     def network(self):
         try:
             return self.datalist["obsd"].stats.network
-        except:
+        except KeyError:
             return None
 
     @property
     def location(self):
         try:
             return self.datalist["obsd"].stats.location
-        except:
+        except KeyError:
             return None
 
     @property
     def channel(self):
         try:
             return self.datalist["obsd"].stats.channel
-        except:
+        except KeyError:
             return None
 
     @property
@@ -270,7 +270,9 @@ def load_winfile_json(flexwin_file, initial_weight=1.0):
     trwins = []
     with open(flexwin_file, 'r') as fh:
         content = json.load(fh)
-        for _sta, _channel in content.iteritems():
+        # for _sta, _channel in content.iteritems():
+        #fm 14/4/20 modify for python3
+        for _sta, _channel in content.items():
             for _chan_win in _channel.itervalues():
                 num_wins = len(_chan_win)
                 if num_wins <= 0:
@@ -428,7 +430,7 @@ class DataContainer(Sequence):
         """
         t1 = time.time()
 
-        _options = ["obsolute_time", "relative_time"]
+        _options = ["absolute_time", "relative_time"]
         window_time_mode = window_time_mode.lower()
         if window_time_mode not in _options:
             raise ValueError("load_winfile mode(%s) incorrect: %s"
@@ -736,13 +738,16 @@ class DataContainer(Sequence):
             os.makedirs(outputdir)
 
         new_synt_dict = self._sort_new_synt()
-        for tag, win_array in new_synt_dict.iteritems():
+        # for tag, win_array in new_synt_dict.iteritems():
+        #fm 14/4/20 modify for python3
+        for tag, win_array in new_synt_dict.items():
             for window in win_array:
                 sta = window.station
                 nw = window.network
-                component = window.component
+                component = window.channel
                 location = window.location
-                filename = "%s.%s.%s.%s.%s.sac" \
+                print(sta, nw, location, component, suffix, tag)
+                filename = "%s.%s.%s.%s.%s.%s.sac" \
                            % (sta, nw, location, component, suffix, tag)
                 outputfn = os.path.join(outputdir, filename)
                 new_synt = window.datalist['new_synt']
@@ -751,7 +756,9 @@ class DataContainer(Sequence):
     def write_new_synt_asdf(self, file_prefix):
         new_synt_dict = self._sort_new_synt()
 
-        for tag, win_array in new_synt_dict.iteritems():
+        # for tag, win_array in new_synt_dict.iteritems():
+        #fm 14/4/20 modify for python3
+        for tag, win_array in new_synt_dict.items():
             filename = "%s.%s.h5" % (file_prefix, tag)
             if os.path.exists(filename):
                 os.remove(filename)

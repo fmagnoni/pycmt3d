@@ -92,7 +92,8 @@ def check_trace_consistent(tr1, tr2, mode="part"):
         raise ValueError("DT of two traces are not the same: %f, %f"
                          % (tr1.stats.delta, tr2.stats.delta))
 
-    if not np.isclose(tr1.stats.starttime - tr2.stats.starttime, 0):
+    if not np.isclose(tr1.stats.starttime - tr2.stats.starttime, 0, atol=1e-01):
+        print(tr1.stats, tr2.stats,tr1.stats.starttime - tr2.stats.starttime)
         raise ValueError("Starttime of two traces not the same: %s, %s"
                          % (tr1.stats.starttime, tr2.stats.starttime))
 
